@@ -1,116 +1,62 @@
-﻿using System.Net;
-using System.Web.Http;
-using Swashbuckle.Swagger.Annotations;
-using Swashbuckle.Examples;
+using Microsoft.AspNetCore.Mvc;
 using System.Data;
+using Dapper;
+using HdbApi.Models;
 
 namespace HdbApi.Controllers
 {
-    public class DataTypesController : ApiController
+    [ApiController]
+    [Route("[controller]")]
+    public class DataTypesController : ControllerBase
     {
+        private readonly Services.IDatabaseService _databaseService;
+        private readonly ILogger<DataTypesController> _logger;
+
+        public DataTypesController(Services.IDatabaseService databaseService, ILogger<DataTypesController> logger)
+        {
+            _databaseService = databaseService;
+            _logger = logger;
+        }
+
         /// <summary>
         /// Get DataType(s)
         /// </summary>
-        /// <remarks>
-        /// Get metadata for available DataType(s) 
-        /// </remarks>
-        /// <param name="id">(Optional) HDB DataType ID(s) of interest. Blank for all DataTypes</param>
-        /// <returns></returns>
-        [HttpGet, Route("datatypes/")]
-        [SwaggerResponse(HttpStatusCode.OK, Type = typeof(Models.DatatypeModel.HdbDatatype))]
-        [SwaggerResponseExample(HttpStatusCode.OK, typeof(DatatypeExample))]
-        [SwaggerOperation(Tags = new[] { "HDB Tables" })]
-        public IHttpActionResult Get([FromUri] string[] id = null)
+        /// <param name="id">Optional HDB DataType IDs to filter by</param>
+        [HttpGet]
+        public async Task<IActionResult> Get([FromQuery] string[]? id = null)
         {
-            IDbConnection db = HdbController.Connect(this.Request.Headers);
-            var dtypeProcessor = new HdbApi.DataAccessLayer.DataTypeRepository();
-            var result = dtypeProcessor.GetDataTypes(db, id);
+            IDbConnection? db = null;
 
             try
             {
-                db.Close();
-                db.Dispose();
-            }
-            catch
-            {
+                db = await _databaseService.GetConnectionAsync(HttpContext);
 
-            }
+                var sql = "select * from HDB_DATATYPE A, HDB_UNIT B where A.UNIT_ID = B.UNIT_ID";
 
-            return Ok(result);
-        }
-
-        /// <summary>
-        /// Delete DataType
-        /// </summary>
-        /// <remarks>
-        /// Delete specified DataType 
-        /// </remarks>
-        /// <param name="id">HDB Datatype ID</param>
-        /// <returns></returns>
-        //[HttpDelete, Route("datatypes/")]
-        //[SwaggerOperation(Tags = new[] { "HDB Tables" })]
-        //public IHttpActionResult Delete([FromUri] int id)
-        //{
-        //    IDbConnection db = HdbController.Connect(this.Request.Headers);
-        //    var dtypeProcessor = new HdbApi.DataAccessLayer.DataTypeRepository();
-        //    return Ok(dtypeProcessor.DeleteDataType(db, id));
-        //}
-
-        /// <summary>
-        /// Update DataType
-        /// </summary>
-        /// <remarks>
-        /// Update a fully defined DataType 
-        /// </remarks>
-        /// <param name="dtype">HDB DataType</param>
-        /// <returns></returns>
-        //[HttpPatch, Route("datatypes/")]
-        //[SwaggerOperation(Tags = new[] { "HDB Tables" })]
-        //public IHttpActionResult Patch([FromBody] Models.DatatypeModel.HdbDatatype dtype)
-        //{
-        //    IDbConnection db = HdbController.Connect(this.Request.Headers);
-        //    var dtypeProcessor = new HdbApi.DataAccessLayer.DataTypeRepository();
-        //    return Ok(dtypeProcessor.UpdateDataType(db, dtype));
-        //}
-
-        /// <summary>
-        /// Add DataType
-        /// </summary>
-        /// <remarks>
-        /// Add a fully defined DataType 
-        /// </remarks>
-        /// <param name="dtype">HDB DataType</param>
-        /// <returns></returns>
-        //[HttpPut, Route("datatypes/")]
-        //[SwaggerOperation(Tags = new[] { "HDB Tables" })]
-        //public IHttpActionResult Put([FromBody] Models.DatatypeModel.HdbDatatype dtype)
-        //{
-        //    IDbConnection db = HdbController.Connect(this.Request.Headers);
-        //    var dtypeProcessor = new HdbApi.DataAccessLayer.DataTypeRepository();
-        //    return Ok(dtypeProcessor.InsertDataType(db, dtype));
-        //}
-
-
-        public class DatatypeExample : IExamplesProvider
-        {
-            public object GetExamples()
-            {
-                var site = new Models.DatatypeModel.HdbDatatype
+                if (id != null && id.Length > 0)
                 {
-                    datatype_id = "1393",
-                    datatype_name = "average reservoir elevation",
-                    datatype_common_name = "ave reservoir elevation",
-                    physical_quantity_name = "water surface elevation",
-                    unit_id = 4,
-                    unit_name = "feet",
-                    unit_common_name = "feet",
-                    allowable_intervals = "non-instant",
-                    agen_id = 0,
-                    cmmnt = ""
-                };
-                return site;
+                    // Use parameter binding to avoid injection
+                    var ids = string.Join(",", id.Select(x => $"'{x}'"));
+                    sql += $" and A.DATATYPE_ID in ({ids})";
+                }
+
+                sql += " order by A.DATATYPE_ID";
+
+                var results = await db.QueryAsync<DataTypeDto>(sql);
+                return Ok(results);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving datatypes");
+                return StatusCode(500, new { error = "Database error", details = ex.Message });
+            }
+            finally
+            {
+                if (db != null)
+                {
+                    _databaseService.CloseConnection(db);
+                }
             }
         }
-
     }
 }
