@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="HDB Data Services API - Swagger UI" />
+    <title>HDB Data Services API</title>
+    <link rel="icon" type="image/png" href="https://www.usbr.gov/img/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/png" href="https://www.usbr.gov/img/favicon.ico" sizes="16x16" />
+    <link rel="stylesheet" href="./swagger-ui.css" />
+    <link rel="stylesheet" href="./index.css" />
+    <link rel="stylesheet" href="/swagger-extensions/screen.css" />
+    <link rel="stylesheet" href="/swagger-extensions/typography.css" />
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="./swagger-ui-bundle.js" charset="UTF-8"> </script>
+<script src="./swagger-ui-standalone-preset.js" charset="UTF-8"> </script>
+<script src="/swagger-extensions/discoveryUrlSelector.js" charset="UTF-8"> </script>
+<script src="/swagger-extensions/basicAuth.js" charset="UTF-8"> </script>
+<script>
+    window.onload = function() {
+      // Build a system
+      const ui = SwaggerUIBundle({
+        url: '/swagger/v1/swagger.json',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "StandaloneLayout",
+        validatorUrl: null,
+        defaultModelsExpandDepth: -1,
+        defaultModelRendering: 'example',
+        displayRequestDuration: true,
+        docExpansion: 'list',
+        filter: false,
+        showExtensions: false,
+        showCommonExtensions: false,
+        tryItOutEnabled: true,
+        requestInterceptor: function(request) {
+          // Add default headers if not already present
+          if (!request.headers['api_hdb']) {
+            request.headers['api_hdb'] = window.hdbAuth?.hdb || 'localhost:1521/FREEPDB1';
+          }
+          if (!request.headers['api_user']) {
+            request.headers['api_user'] = window.hdbAuth?.user || 'app_user';
+          }
+          if (!request.headers['api_pass']) {
+            request.headers['api_pass'] = window.hdbAuth?.pass || 'password';
+          }
+
+          // Normalize multiline ID inputs into comma-separated values for query parameters
+          try {
+            const url = new URL(request.url, window.location.origin);
+            const keys = ['sdi', 'sid', 'did', 'id', 'mrid', 'site_id', 'datatype_id', 'model_run_id'];
+            keys.forEach(key => {
+              const values = url.searchParams.getAll(key);
+              if (values.length) {
+                url.searchParams.delete(key);
+                values.forEach(v => {
+                  const normalized = v
+                    .split(/\r?\n/)
+                    .map(p => p.trim())
+                    .filter(Boolean)
+                    .join(',');
+                  url.searchParams.append(key, normalized);
+                });
+              }
+            });
+            request.url = url.toString();
+          } catch (e) {
+            // ignore invalid URL
+          }
+
+          return request;
+        }
+      });
+
+      window.ui = ui;
+    };
+</script>
+</body>
+</html>

@@ -10,19 +10,34 @@ namespace HdbApi.Models
         /// <summary>
         /// Unique site-datatype identifier
         /// </summary>
-        [JsonPropertyName("SITE_DATATYPE_ID")]
+        [JsonPropertyName("site_datatype_id")]
         public int SITE_DATATYPE_ID { get; set; }
 
         /// <summary>
         /// Site identifier
         /// </summary>
-        [JsonPropertyName("SITE_ID")]
+        [JsonPropertyName("site_id")]
         public int SITE_ID { get; set; }
 
         /// <summary>
         /// Datatype identifier
         /// </summary>
-        [JsonPropertyName("DATATYPE_ID")]
+        [JsonPropertyName("datatype_id")]
         public int DATATYPE_ID { get; set; }
+
+        /// <summary>
+        /// Metadata for the site and datatype associated with this SiteDatatype
+        /// </summary>
+        [JsonPropertyName("metadata")]
+        public SiteDataTypeMetadataDto? Metadata { get; set; }
+    }
+
+    public class SiteDataTypeMetadataDto
+    {
+        [JsonPropertyName("site_metadata")]
+        public SiteDto? SiteMetadata { get; set; }
+
+        [JsonPropertyName("datatype_metadata")]
+        public DataTypeDto? DatatypeMetadata { get; set; }
     }
 }

@@ -1,4 +1,5 @@
 using System.Data;
+using System.IO;
 using Oracle.ManagedDataAccess.Client;
 using Dapper;
 
@@ -14,10 +15,67 @@ namespace HdbApi.Services
     public class DatabaseService : IDatabaseService
     {
         private readonly ILogger<DatabaseService> _logger;
+        private HashSet<string>? _allowedHdbs;
 
         public DatabaseService(ILogger<DatabaseService> logger)
         {
             _logger = logger;
+        }
+
+        private HashSet<string> GetAllowedHdbs()
+        {
+            if (_allowedHdbs == null)
+            {
+                _allowedHdbs = LoadAllowedHdbsFromFile();
+            }
+            return _allowedHdbs;
+        }
+
+        private HashSet<string> LoadAllowedHdbsFromFile()
+        {
+            try
+            {
+                var allowedHdbs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                
+                if (File.Exists("hostnames.txt"))
+                {
+                    var lines = File.ReadAllLines("hostnames.txt");
+                    foreach (var line in lines)
+                    {
+                        if (!string.IsNullOrWhiteSpace(line))
+                        {
+                            // Extract database name from format "DATABASENAME - Description"
+                            var dbName = line.Split(new[] { " - " }, StringSplitOptions.None)[0].Trim();
+                            if (!string.IsNullOrEmpty(dbName))
+                            {
+                                allowedHdbs.Add(dbName.ToUpper());
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("hostnames.txt file not found, using default allowed databases");
+                    // Fallback to hardcoded list if file doesn't exist
+                    allowedHdbs = new HashSet<string>(StringComparer.OrdinalIgnoreCase) 
+                    { 
+                        "LCHDB", "UCHDB2", "UCHDBT", "YAOHDB", "ECOHDB", 
+                        "LBOHDB", "KBOHDB", "PNHYD", "GPHYD", "FREEPDB1" 
+                    };
+                }
+                
+                return allowedHdbs;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading allowed HDBs from hostnames.txt, using default list");
+                // Fallback to hardcoded list on error
+                return new HashSet<string>(StringComparer.OrdinalIgnoreCase) 
+                { 
+                    "LCHDB", "UCHDB2", "UCHDBT", "YAOHDB", "ECOHDB", 
+                    "LBOHDB", "KBOHDB", "PNHYD", "GPHYD", "FREEPDB1" 
+                };
+            }
         }
 
         public async Task<IDbConnection> GetConnectionAsync(HttpContext context)
@@ -43,6 +101,13 @@ namespace HdbApi.Services
 
         public async Task<IDbConnection> GetConnectionAsync(string hdb, string username, string password)
         {
+            // Validate hdb against allowed list loaded from hostnames.txt
+            var allowedHdbs = GetAllowedHdbs();
+            if (!allowedHdbs.Contains(hdb.ToUpper()))
+            {
+                throw new ArgumentException($"HDB '{hdb}' is not in the allowed list of databases");
+            }
+
             try
             {
                 _logger.LogInformation("Connecting to HDB: {Hdb} as user: {Username}", hdb, username);
@@ -75,12 +140,21 @@ namespace HdbApi.Services
                 throw;
             }
         }
-
         public void CloseConnection(IDbConnection connection)
         {
-            if (connection != null)
+            try
             {
-                connection.Close();
+                if (connection != null && connection.State != ConnectionState.Closed)
+                {
+                    connection.Close();
+                }
+            }
+            catch
+            {
+                // ignore closing errors
+            }
+            finally
+            {
                 connection.Dispose();
             }
         }

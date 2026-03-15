@@ -6,7 +6,7 @@ using HdbApi.Models;
 namespace HdbApi.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
+    [Route("datatypes")]
     public class DataTypesController : ControllerBase
     {
         private readonly Services.IDatabaseService _databaseService;
@@ -21,6 +21,9 @@ namespace HdbApi.Controllers
         /// <summary>
         /// Get DataType(s)
         /// </summary>
+        /// <remarks>
+        /// Get metadata for available HDB datatype(s)
+        /// </remarks>
         /// <param name="id">Optional HDB DataType IDs to filter by</param>
         [HttpGet]
         public async Task<IActionResult> Get([FromQuery] string[]? id = null)
@@ -42,7 +45,17 @@ namespace HdbApi.Controllers
 
                 sql += " order by A.DATATYPE_ID";
 
-                var results = await db.QueryAsync<DataTypeDto>(sql);
+                var results = (await db.QueryAsync<DataTypeDto>(sql)).ToList();
+
+                // Legacy behavior: return 0 for agen_id instead of null
+                results.ForEach(r =>
+                {
+                    if (!r.AGEN_ID.HasValue)
+                    {
+                        r.AGEN_ID = 0;
+                    }
+                });
+
                 return Ok(results);
             }
             catch (Exception ex)

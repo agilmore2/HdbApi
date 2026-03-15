@@ -4,9 +4,14 @@ using Dapper;
 using HdbApi.Models;
 
 namespace HdbApi.Controllers
-{
+{[System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]    public enum ModelRunIdType
+    {
+        model_run_id,
+        model_id
+    }
+
     [ApiController]
-    [Route("[controller]")]
+    [Route("modelruns")]
     public class ModelRunsController : ControllerBase
     {
         private readonly Services.IDatabaseService _databaseService;
@@ -23,11 +28,14 @@ namespace HdbApi.Controllers
         /// <summary>
         /// Get Model Run(s)
         /// </summary>
+        /// <remarks>
+        /// Get metadata for available HDB model run(s)
+        /// </remarks>
         /// <param name="idtype">Optional ID category to query. "model_run_id" (default) or "model_id".</param>
         /// <param name="id">Optional IDs to filter by (model_run_id or model_id depending on idtype).</param>
         /// <param name="modelrunname">Optional model run name filter (case-insensitive partial match).</param>
         [HttpGet]
-        public async Task<IActionResult> Get([FromQuery] string? idtype = null, [FromQuery] int[]? id = null, [FromQuery] string? modelrunname = null)
+        public async Task<IActionResult> Get([FromQuery] ModelRunIdType? idtype = null, [FromQuery] int[]? id = null, [FromQuery] string? modelrunname = null)
         {
             IDbConnection? db = null;
 
@@ -35,7 +43,7 @@ namespace HdbApi.Controllers
             {
                 db = await _databaseService.GetConnectionAsync(HttpContext);
 
-                var effectiveIdType = string.IsNullOrWhiteSpace(idtype) ? DefaultIdType : idtype.ToLower();
+                var effectiveIdType = idtype?.ToString() ?? DefaultIdType;
                 if (effectiveIdType != "model_run_id" && effectiveIdType != "model_id")
                 {
                     effectiveIdType = DefaultIdType;

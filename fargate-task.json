@@ -1,0 +1,58 @@
+{
+  "family": "hdb-api-task",
+  "taskRoleArn": "arn:aws:iam::account:role/ecsTaskRole",
+  "executionRoleArn": "arn:aws:iam::account:role/ecsTaskExecutionRole",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "containerDefinitions": [
+    {
+      "name": "hdb-api",
+      "image": "your-registry/hdb-api:latest",
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "hostPort": 80,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "ASPNETCORE_ENVIRONMENT",
+          "value": "Production"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DB_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:region:account:secret:hdb-db-creds"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "tnsnames-volume",
+          "containerPath": "/opt/oracle/instantclient/network/admin",
+          "readOnly": true
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/hdb-api",
+          "awslogs-region": "us-west-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ],
+  "volumes": [
+    {
+      "name": "tnsnames-volume",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "fs-12345678",
+        "rootDirectory": "/tnsnames"
+      }
+    }
+  ]
+}

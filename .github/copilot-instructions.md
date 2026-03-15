@@ -92,5 +92,4 @@ This codebase is currently migrating from .NET Framework to .NET Core (see `migr
 - Raw SQL injection risks in some queries
 - No async/await patterns (synchronous database calls)
 - Controllers mix business logic with HTTP concerns
-- CSV catalog files (`hydromet*.csv`) used for metadata caching</content>
-<parameter name="filePath">/home/agilmore/workspace/HdbApi/.github/copilot-instructions.md
+- CSV catalog files (`hydromet*.csv`) used for metadata caching

@@ -10,13 +10,13 @@ namespace HdbApi.Models
         /// <summary>
         /// Date/time of the data point
         /// </summary>
-        [JsonPropertyName("DATETIME")]
+        [JsonPropertyName("datetime")]
         public DateTime DATETIME { get; set; }
 
         /// <summary>
         /// Value of the data point
         /// </summary>
-        [JsonPropertyName("VALUE")]
+        [JsonPropertyName("value")]
         public string? VALUE { get; set; }
     }
 }

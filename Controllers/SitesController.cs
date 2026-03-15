@@ -6,7 +6,7 @@ using HdbApi.Models;
 namespace HdbApi.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
+    [Route("sites")]
     public class SitesController : ControllerBase
     {
         private readonly Services.IDatabaseService _databaseService;
@@ -19,9 +19,12 @@ namespace HdbApi.Controllers
         }
 
         /// <summary>
-        /// Get sites from HDB
+        /// Get Site(s)
         /// </summary>
-        /// <param name="id">Optional site IDs to filter by</param>
+        /// <remarks>
+        /// Get metadata for available HDB site(s)
+        /// </remarks>
+        /// <param name="id">Optional HDB Site IDs to filter by</param>
         [HttpGet]
         public async Task<IActionResult> GetSites([FromQuery] string[]? id = null)
         {
@@ -32,12 +35,13 @@ namespace HdbApi.Controllers
                 // Get database connection from headers
                 db = await _databaseService.GetConnectionAsync(HttpContext);
 
-                // Build SQL query
-                var sql = @"select SITE_ID, SITE_NAME, SITE_COMMON_NAME, STATE_CODE,
-                           OBJECTTYPE_NAME, DB_SITE_CODE
-                           from HDB_SITE A, HDB_OBJECTTYPE B, HDB_STATE C
-                           where A.OBJECTTYPE_ID = B.OBJECTTYPE_ID
-                           and A.STATE_ID = C.STATE_ID";
+                // Build SQL query (matches legacy API column order)
+                var sql = @"select A.SITE_ID, A.SITE_NAME, A.SITE_COMMON_NAME, A.DESCRIPTION, A.ELEVATION, A.LAT, A.LONGI, A.DB_SITE_CODE, " +
+                          "A.OBJECTTYPE_ID, B.OBJECTTYPE_NAME, A.BASIN_ID, A.HYDROLOGIC_UNIT, A.RIVER_MILE, A.SEGMENT_NO, A.STATE_ID, C.STATE_CODE, " +
+                          "A.USGS_ID, A.NWS_CODE, A.SHEF_CODE, A.SCS_ID, A.PARENT_OBJECTTYPE_ID, A.PARENT_SITE_ID " +
+                          "from HDB_SITE A, HDB_OBJECTTYPE B, HDB_STATE C " +
+                          "where A.OBJECTTYPE_ID = B.OBJECTTYPE_ID " +
+                          "and A.STATE_ID = C.STATE_ID";
 
                 if (id != null && id.Length > 0)
                 {
