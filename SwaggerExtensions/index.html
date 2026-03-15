@@ -54,29 +54,6 @@
             request.headers['api_pass'] = window.hdbAuth?.pass || 'password';
           }
 
-          // Normalize multiline ID inputs into comma-separated values for query parameters
-          try {
-            const url = new URL(request.url, window.location.origin);
-            const keys = ['sdi', 'sid', 'did', 'id', 'mrid', 'site_id', 'datatype_id', 'model_run_id'];
-            keys.forEach(key => {
-              const values = url.searchParams.getAll(key);
-              if (values.length) {
-                url.searchParams.delete(key);
-                values.forEach(v => {
-                  const normalized = v
-                    .split(/\r?\n/)
-                    .map(p => p.trim())
-                    .filter(Boolean)
-                    .join(',');
-                  url.searchParams.append(key, normalized);
-                });
-              }
-            });
-            request.url = url.toString();
-          } catch (e) {
-            // ignore invalid URL
-          }
-
           return request;
         }
       });
