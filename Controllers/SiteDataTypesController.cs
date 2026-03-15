@@ -24,11 +24,11 @@ namespace HdbApi.Controllers
         /// <remarks>
         /// Get metadata for available HDB site-datatype relationship(s)
         /// </remarks>
-        /// <param name="sdi">Optional HDB SiteDataType IDs to filter by</param>
-        /// <param name="sid">Optional HDB Site IDs to filter by</param>
-        /// <param name="did">Optional HDB DataType IDs to filter by</param>
+        /// <param name="sdi">Optional comma-separated HDB SiteDataType IDs to filter by (e.g., 1,2,3)</param>
+        /// <param name="sid">Optional comma-separated HDB Site IDs to filter by (e.g., 1,2,3)</param>
+        /// <param name="did">Optional comma-separated HDB DataType IDs to filter by (e.g., 1,2,3)</param>
         [HttpGet]
-        public async Task<IActionResult> Get([FromQuery] string[]? sdi = null, [FromQuery] string[]? sid = null, [FromQuery] string[]? did = null)
+        public async Task<IActionResult> Get([FromQuery] string? sdi = null, [FromQuery] string? sid = null, [FromQuery] string? did = null)
         {
             IDbConnection? db = null;
 
@@ -40,22 +40,34 @@ namespace HdbApi.Controllers
 
                 var conditions = new List<string>();
 
-                if (sdi != null && sdi.Length > 0)
+                if (!string.IsNullOrEmpty(sdi))
                 {
-                    var ids = string.Join(",", sdi);
-                    conditions.Add($"SITE_DATATYPE_ID in ({ids})");
+                    var ids = sdi.Split(',').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x));
+                    if (ids.Any())
+                    {
+                        var idList = string.Join(",", ids);
+                        conditions.Add($"SITE_DATATYPE_ID in ({idList})");
+                    }
                 }
 
-                if (sid != null && sid.Length > 0)
+                if (!string.IsNullOrEmpty(sid))
                 {
-                    var ids = string.Join(",", sid);
-                    conditions.Add($"SITE_ID in ({ids})");
+                    var ids = sid.Split(',').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x));
+                    if (ids.Any())
+                    {
+                        var idList = string.Join(",", ids);
+                        conditions.Add($"SITE_ID in ({idList})");
+                    }
                 }
 
-                if (did != null && did.Length > 0)
+                if (!string.IsNullOrEmpty(did))
                 {
-                    var ids = string.Join(",", did);
-                    conditions.Add($"DATATYPE_ID in ({ids})");
+                    var ids = did.Split(',').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x));
+                    if (ids.Any())
+                    {
+                        var idList = string.Join(",", ids);
+                        conditions.Add($"DATATYPE_ID in ({idList})");
+                    }
                 }
 
                 if (conditions.Any())

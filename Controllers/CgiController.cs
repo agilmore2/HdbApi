@@ -27,13 +27,13 @@ namespace HdbApi.Controllers
         /// Calls the stored procedure used by the legacy CGI program for backwards compatibility
         /// </remarks>
         /// <param name="svr">HDB instance name</param>
-        /// <param name="sdi">Comma-separated list of SDIs (enter one per line or comma-separated)</param>
+        /// <param name="sdi">Comma-separated list of SDIs (e.g., 200001,200002)</param>
         /// <param name="tstp">Interval table {INSTANT, HOUR, DAY, MONTH, YEAR, WY}</param>
         /// <param name="t1">Start date (allowed formats: yyyy-MM-dd, yyyy-MM-ddTHH:mm:ss, etc.)</param>
         /// <param name="t2">End date (allowed formats: yyyy-MM-dd, yyyy-MM-ddTHH:mm:ss, etc.)</param>
         /// <param name="table">Optional - HDB Table {R, M, B}</param>
         /// <param name="mrid">Optional - Model Run ID if table=M</param>
-        /// <param name="format">Output format {json, html, 1, 2, 3, 4, 5, 6, 7, 8, 88, 9, 99}</param>
+        /// <param name="format">Output format {json, html, csv, 1, 2, 3, 4, 5, 6, 7, 8, 88, 9, 99, graph}</param>
         [HttpGet]
         [Produces("application/json", "text/json", "text/html")]
         public async Task<IActionResult> GetCgiData(
@@ -43,7 +43,7 @@ namespace HdbApi.Controllers
             [FromQuery] string? t2,
             [FromQuery] string tstp = "dy",
             [FromQuery] CgiTableType table = CgiTableType.R,
-            [FromQuery] string mrid = "0",
+            [FromQuery] string? mrid = null,
             [FromQuery] string format = "json")
         {
             if (string.IsNullOrEmpty(svr) || string.IsNullOrEmpty(sdi) || string.IsNullOrEmpty(t1) || string.IsNullOrEmpty(t2))
@@ -271,64 +271,12 @@ if (table == CgiTableType.M && !string.IsNullOrEmpty(mrid) && mrid != "0")
 
         private string BuildHtmlOutput(CgiModel.HdbCgiJson data, string format)
         {
-            var html = new StringBuilder();
-            html.AppendLine("<!DOCTYPE html>");
-            html.AppendLine("<html><head><title>HDB CGI Data</title></head><body>");
-
-            bool hasPreamble = format == "2" || format.ToLower() == "html";
-            if (hasPreamble)
-            {
-                html.AppendLine($"<h1>HDB Time Series Data</h1>");
-                html.AppendLine($"<p>Query Date: {data.QueryDate}</p>");
-                html.AppendLine($"<p>Start Date: {data.StartDate}</p>");
-                html.AppendLine($"<p>End Date: {data.EndDate}</p>");
-                html.AppendLine($"<p>Time Step: {data.TimeStep}</p>");
-                html.AppendLine($"<p>Data Source: {data.DataSource}</p>");
-            }
-
-            if (data.Series != null)
-            {
-                foreach (var series in data.Series)
-                {
-                    if (hasPreamble)
-                    {
-                        html.AppendLine($"<h2>SDI: {series.SDI} - {series.SiteName}</h2>");
-                        html.AppendLine($"<p>Data Type: {series.DataTypeName} ({series.DataTypeUnit})</p>");
-                        html.AppendLine($"<p>Location: {series.Latitude}, {series.Longitude} (Elevation: {series.Elevation})</p>");
-                    }
-
-                    if (series.Data != null && series.Data.Any())
-                    {
-                        html.AppendLine("<table border='1'><tr><th>DateTime</th><th>Value</th></tr>");
-                        foreach (var point in series.Data)
-                        {
-                            html.AppendLine($"<tr><td>{point.t}</td><td>{point.v}</td></tr>");
-                        }
-                        html.AppendLine("</table>");
-                    }
-                    else
-                    {
-                        html.AppendLine("<p>No data available</p>");
-                    }
-                }
-            }
-
-            html.AppendLine("</body></html>");
-            return html.ToString();
+            var txt = BuildTxtArray(data);
+            return FormatOutput(txt.ToArray(), format);
         }
         private async Task<CgiModel.HdbCgiJson> GetCgiJsonData(IDbConnection db, DynamicParameters parameters, string sdi, DateTime t1, DateTime t2, CgiTableType table, string mrid, string tstp)
         {
-            // TODO: Implement database query to get data
-            // For now, return empty
-            return new CgiModel.HdbCgiJson
-            {
-                QueryDate = DateTime.Now.ToString(),
-                StartDate = t1.ToString(),
-                EndDate = t2.ToString(),
-                TimeStep = tstp,
-                DataSource = table == CgiTableType.M ? "Modeled" : "Observed",
-                Series = new List<CgiModel.Sites>() // Empty for now
-            };
+            return await GetJsonData(db, parameters, sdi, t1, t2, table, mrid, tstp);
         }
         private List<string> BuildTxtArray(CgiModel.HdbCgiJson data)
         {
@@ -433,9 +381,9 @@ if (table == CgiTableType.M && !string.IsNullOrEmpty(mrid) && mrid != "0")
 
             // format == 99 or format == graph
             if (isAmChart || isDyGraph)
-            { 
-                // Placeholder for dyGraphs
-                htmlOut.Add("<html><body><p>DyGraphs chart would be here</p></body></html>");
+            {
+                // Generate DyGraphs HTML
+                htmlOut = GenerateDyGraphsHtml(outFile, outFormat);
             }
             // format == 8
             else if (isHdbWebSeriesQuery)
@@ -631,6 +579,129 @@ if (table == CgiTableType.M && !string.IsNullOrEmpty(mrid) && mrid != "0")
                     break;
             }
             return text.ToString();
+        }
+
+        private List<string> GenerateDyGraphsHtml(string[] outFile, string format)
+        {
+            var htmlOut = new List<string>();
+
+            // Find data boundaries
+            int startOfDataRow = Array.IndexOf(outFile, "BEGIN DATA") + 2;
+            int endOfDataRow = Array.IndexOf(outFile, "END DATA");
+
+            // Get series information from lines 12 to startOfDataRow-1
+            var seriesInfo = new List<string>();
+            for (int i = 12; i < startOfDataRow - 1; i++)
+            {
+                if (i < outFile.Length)
+                {
+                    seriesInfo.Add(outFile[i]);
+                }
+            }
+
+            // Extract units from series info
+            var units = new List<string>();
+            foreach (var info in seriesInfo)
+            {
+                var unitMatch = System.Text.RegularExpressions.Regex.Match(info, @"(in ).*");
+                if (unitMatch.Success)
+                {
+                    units.Add(unitMatch.Value.Replace("in ", ""));
+                }
+                else
+                {
+                    units.Add(""); // Default empty unit
+                }
+            }
+
+            // Build HTML structure
+            htmlOut.Add(@"<!DOCTYPE HTML PUBLIC ""-//W3C//DTD HTML 4.01//EN"" ""http://www.w3.org/TR/html4/strict.dtd"">");
+            htmlOut.Add("<html>");
+            htmlOut.Add("<head>");
+            htmlOut.Add(@"<meta http-equiv=""Content-Type"" content=""text/html; charset=utf-8"">");
+            htmlOut.Add("<title>HDB CGI Data Query Graph</title>");
+            htmlOut.Add("<!-- Call DyGraphs JavaScript Reference -->");
+            htmlOut.Add(@"<script type=""text/javascript"" src=""https://www.usbr.gov/js/waterops/dygraph.min.js""></script>");
+            htmlOut.Add(@"<link rel=""stylesheet"" href=""https://www.usbr.gov/js/waterops/dygraph.css"">");
+            htmlOut.Add(@"<style type=""text/css"">");
+            htmlOut.Add("#graphdiv {position: absolute; left: 50px; right: 50px; top: 75px; bottom: 50px;}");
+            htmlOut.Add("#graphdiv .dygraph-legend {width: 300px !important; background-color: transparent !important; left: 75px !important;}");
+            htmlOut.Add("</style></head>");
+            htmlOut.Add("<body>");
+            htmlOut.Add("<!-- Place DyGraphs Chart -->");
+            htmlOut.Add(@"<div id=""status"" style=""width:1000px; font-size:0.8em; padding-top:5px;""></div>");
+            htmlOut.Add("<br>");
+            htmlOut.Add(@"<div id=""graphdiv""></div>");
+            htmlOut.Add("");
+            htmlOut.Add("<!-- Build DyGraphs Chart -->");
+            htmlOut.Add(@"<script type=""text/javascript"">");
+
+            // Build data header
+            string headerString = @"""Date,";
+            foreach (var info in seriesInfo)
+            {
+                headerString += info.Replace(",", " ") + ",";
+            }
+            headerString = headerString.Remove(headerString.Length - 1) + @"\n"" +";
+
+            htmlOut.Add("g = new Dygraph(");
+            htmlOut.Add(@"document.getElementById(""graphdiv""),");
+            htmlOut.Add("");
+
+            // Add data
+            htmlOut.Add(headerString);
+
+            for (int i = startOfDataRow; i < endOfDataRow; i++)
+            {
+                var val = outFile[i].Split(',');
+                if (val.Length > 0)
+                {
+                    var t = DateTime.Parse(val[0]).ToString("yyyy-MM-dd HH:mm");
+                    string dataRow = "\"" + t + ",";
+                    for (int j = 1; j < val.Length; j++)
+                    {
+                        var jthVal = val[j].Trim();
+                        if (string.IsNullOrEmpty(jthVal) || jthVal == "NaN")
+                        {
+                            jthVal = "NaN";
+                        }
+                        dataRow += jthVal + ",";
+                    }
+                    dataRow = dataRow.Remove(dataRow.Length - 1); // Remove last comma
+
+                    if (i + 1 == endOfDataRow)
+                    {
+                        htmlOut.Add(dataRow + "\\n\"");
+                    }
+                    else
+                    {
+                        htmlOut.Add(dataRow + "\\n\" +");
+                    }
+                }
+            }
+
+            // Add chart options
+            htmlOut.Add(", {fillGraph: true, showRangeSelector: true, legend: 'always'");
+            htmlOut.Add(", xlabel: 'Date', ylabel: '" + (units.Count > 0 ? units[0] : "") + "', labelsSeparateLines: true");
+            htmlOut.Add(", labelsDiv: document.getElementById('status'), axisLabelWidth: 75");
+            htmlOut.Add(", highlightCircleSize: 5, pointSize: 1.5, strokeWidth: 1.5");
+
+            if (units.Distinct().Count() > 1)
+            {
+                htmlOut.Add(", y2label: '" + units[1] + "', '" + seriesInfo[1].Replace(",", " ") + "' : { axis : { } } }");
+            }
+            else
+            {
+                htmlOut.Add("}");
+            }
+
+            htmlOut.Add(");");
+            htmlOut.Add("");
+            htmlOut.Add("</script>");
+            htmlOut.Add("</body>");
+            htmlOut.Add("</html>");
+
+            return htmlOut;
         }
     }
 

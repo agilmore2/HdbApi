@@ -24,9 +24,9 @@ namespace HdbApi.Controllers
         /// <remarks>
         /// Get metadata for available HDB site(s)
         /// </remarks>
-        /// <param name="id">Optional HDB Site IDs to filter by</param>
+        /// <param name="id">Optional comma-separated HDB Site IDs to filter by (e.g., 1,2,3)</param>
         [HttpGet]
-        public async Task<IActionResult> GetSites([FromQuery] string[]? id = null)
+        public async Task<IActionResult> GetSites([FromQuery] string? id = null)
         {
             IDbConnection? db = null;
 
@@ -43,10 +43,14 @@ namespace HdbApi.Controllers
                           "where A.OBJECTTYPE_ID = B.OBJECTTYPE_ID " +
                           "and A.STATE_ID = C.STATE_ID";
 
-                if (id != null && id.Length > 0)
+                if (!string.IsNullOrEmpty(id))
                 {
-                    var ids = string.Join(",", id.Select(x => $"'{x}'"));
-                    sql += $" and A.SITE_ID in ({ids})";
+                    var ids = id.Split(',').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x));
+                    if (ids.Any())
+                    {
+                        var idList = string.Join(",", ids.Select(x => $"'{x}'"));
+                        sql += $" and A.SITE_ID in ({idList})";
+                    }
                 }
 
                 sql += " order by A.SITE_ID";

@@ -35,7 +35,7 @@ namespace HdbApi.Controllers
         /// <param name="id">Optional IDs to filter by (model_run_id or model_id depending on idtype).</param>
         /// <param name="modelrunname">Optional model run name filter (case-insensitive partial match).</param>
         [HttpGet]
-        public async Task<IActionResult> Get([FromQuery] ModelRunIdType? idtype = null, [FromQuery] int[]? id = null, [FromQuery] string? modelrunname = null)
+        public async Task<IActionResult> Get([FromQuery] ModelRunIdType? idtype = null, [FromQuery] string? id = null, [FromQuery] string? modelrunname = null)
         {
             IDbConnection? db = null;
 
@@ -53,10 +53,14 @@ namespace HdbApi.Controllers
                           "b.user_name, b.cmmnt as model_run_cmmnt, A.model_id, A.model_name, A.cmmnt as model_cmmnt " +
                           "from hdb_model A, ref_model_run B where A.model_id = b.model_id";
 
-                if (id != null && id.Length > 0)
+                if (!string.IsNullOrEmpty(id))
                 {
-                    var ids = string.Join(",", id);
-                    sql += $" and b.{effectiveIdType} in ({ids})";
+                    var ids = id.Split(',').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x));
+                    if (ids.Any())
+                    {
+                        var idList = string.Join(",", ids.Select(x => $"'{x}'"));
+                        sql += $" and b.{effectiveIdType} in ({idList})";
+                    }
                 }
 
                 if (!string.IsNullOrWhiteSpace(modelrunname))

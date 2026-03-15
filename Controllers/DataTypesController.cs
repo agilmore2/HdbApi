@@ -24,9 +24,9 @@ namespace HdbApi.Controllers
         /// <remarks>
         /// Get metadata for available HDB datatype(s)
         /// </remarks>
-        /// <param name="id">Optional HDB DataType IDs to filter by</param>
+        /// <param name="id">Optional comma-separated HDB DataType IDs to filter by (e.g., 1,2,3)</param>
         [HttpGet]
-        public async Task<IActionResult> Get([FromQuery] string[]? id = null)
+        public async Task<IActionResult> Get([FromQuery] string? id = null)
         {
             IDbConnection? db = null;
 
@@ -36,13 +36,15 @@ namespace HdbApi.Controllers
 
                 var sql = "select * from HDB_DATATYPE A, HDB_UNIT B where A.UNIT_ID = B.UNIT_ID";
 
-                if (id != null && id.Length > 0)
+                if (!string.IsNullOrEmpty(id))
                 {
-                    // Use parameter binding to avoid injection
-                    var ids = string.Join(",", id.Select(x => $"'{x}'"));
-                    sql += $" and A.DATATYPE_ID in ({ids})";
+                    var ids = id.Split(',').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x));
+                    if (ids.Any())
+                    {
+                        var idList = string.Join(",", ids.Select(x => $"'{x}'"));
+                        sql += $" and A.DATATYPE_ID in ({idList})";
+                    }
                 }
-
                 sql += " order by A.DATATYPE_ID";
 
                 var results = (await db.QueryAsync<DataTypeDto>(sql)).ToList();
