@@ -61,7 +61,6 @@ builder.Services.AddSwaggerGen(c =>
             "sites" or "datatypes" or "modelruns" or "sitedatatypes" => new[] { "HDB Tables" },
             "hdb" or "connect" => new[] { "HDB Connections" },
             "series" or "cgi" => new[] { "HDB TimeSeries Data" },
-            "test" => new[] { "Testing Sandbox" },
             _ => new[] { controller ?? "default" }
         };
     });

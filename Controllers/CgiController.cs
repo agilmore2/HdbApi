@@ -459,12 +459,12 @@ if (table == CgiTableType.M && !string.IsNullOrEmpty(mrid) && mrid != "0")
                         {
                             htmlOut.Add("<TABLE BORDER=1>");
                             i++;
-                            htmlOut.Add("<TR><TH>" + outFile[i].Replace(",", "</TH><TH>") + "</TH></TR>");
+                            htmlOut.Add("<TR><TH>" + string.Join("</TH><TH>", outFile[i].Split(',').Select(System.Net.WebUtility.HtmlEncode)) + "</TH></TR>");
                         }
                         else if (i == outFile.Length - 1)
                         { }
                         else
-                        { htmlOut.Add("<TR><TD>" + outFile[i].Replace(",", "</TD><TD>") + "</TD></TR>"); }
+                        { htmlOut.Add("<TR><TD>" + string.Join("</TD><TD>", outFile[i].Split(',').Select(System.Net.WebUtility.HtmlEncode)) + "</TD></TR>"); }
                     }
                 }
                 // Add final lines
