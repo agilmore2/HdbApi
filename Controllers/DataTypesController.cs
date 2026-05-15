@@ -41,8 +41,9 @@ namespace HdbApi.Controllers
                     var ids = id.Split(',').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x));
                     if (ids.Any())
                     {
-                        var idList = string.Join(",", ids.Select(x => $"'{x}'"));
-                        sql += $" and A.DATATYPE_ID in ({idList})";
+                        if (!ids.All(x => long.TryParse(x, out _)))
+                            return BadRequest(new { error = "id must be integers" });
+                        sql += $" and A.DATATYPE_ID in ({string.Join(",", ids)})";
                     }
                 }
                 sql += " order by A.DATATYPE_ID";

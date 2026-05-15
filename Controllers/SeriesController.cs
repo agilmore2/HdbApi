@@ -7,6 +7,12 @@ using Oracle.ManagedDataAccess.Client;
 
 namespace HdbApi.Controllers
 {
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public enum SeriesInterval { instant, hour, day, month, year }
+
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public enum SeriesTableType { R, M }
+
     [ApiController]
     [Route("series")]
     public class SeriesController : ControllerBase
@@ -37,8 +43,8 @@ namespace HdbApi.Controllers
             [FromQuery] string sdi,
             [FromQuery] DateTime t1,
             [FromQuery] DateTime t2,
-            [FromQuery] string interval = "day",
-            [FromQuery] string table = "R",
+            [FromQuery] SeriesInterval interval = SeriesInterval.day,
+            [FromQuery] SeriesTableType table = SeriesTableType.R,
             [FromQuery] int? mrid = null)
         {
             if (string.IsNullOrEmpty(sdi))
@@ -46,7 +52,7 @@ namespace HdbApi.Controllers
                 return BadRequest(new { error = "Site Datatype ID (sdi) is required" });
             }
 
-            if (table.ToUpper() == "M" && !mrid.HasValue)
+            if (table == SeriesTableType.M && !mrid.HasValue)
             {
                 return BadRequest(new { error = "Model Run ID (mrid) is required when table=M" });
             }
@@ -58,7 +64,7 @@ namespace HdbApi.Controllers
                 db = await _databaseService.GetConnectionAsync(HttpContext);
 
                 // Build table name
-                var tableName = $"{table.ToUpper()}_{interval.ToUpper()}";
+                var tableName = $"{table.ToString().ToUpper()}_{interval.ToString().ToUpper()}";
 
                 // Build SQL query
                 var sql = $"select START_DATE_TIME as DATETIME, cast(VALUE as varchar(20)) as VALUE " +
@@ -66,7 +72,7 @@ namespace HdbApi.Controllers
                          $"where SITE_DATATYPE_ID = :sdi " +
                          $"and START_DATE_TIME between :t1 and :t2";
 
-                if (table.ToUpper() == "M" && mrid.HasValue)
+                if (table == SeriesTableType.M && mrid.HasValue)
                 {
                     sql += " and MODEL_RUN_ID = :mrid";
                 }
@@ -201,7 +207,7 @@ namespace HdbApi.Controllers
         /// <param name="startDate">Optional start date for deletion range</param>
         /// <param name="endDate">Optional end date for deletion range</param>
         [HttpDelete("r-delete")]
-        public async Task<IActionResult> DeleteObservedData([FromQuery] string sdi, [FromQuery] string interval = "instant", [FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
+        public async Task<IActionResult> DeleteObservedData([FromQuery] string sdi, [FromQuery] SeriesInterval interval = SeriesInterval.instant, [FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
         {
             if (string.IsNullOrEmpty(sdi))
             {
@@ -243,7 +249,7 @@ namespace HdbApi.Controllers
                 int deletedCount = 0;
                 foreach (var dateTime in dataPoints)
                 {
-                    hdbProcessor.delete_from_hdb(db, decimal.Parse(sdi), dateTime, interval.ToLower());
+                    hdbProcessor.delete_from_hdb(db, decimal.Parse(sdi), dateTime, interval.ToString());
                     deletedCount++;
                 }
 
@@ -275,7 +281,7 @@ namespace HdbApi.Controllers
         /// <param name="startDate">Optional start date for deletion range</param>
         /// <param name="endDate">Optional end date for deletion range</param>
         [HttpDelete("m-delete")]
-        public async Task<IActionResult> DeleteModeledData([FromQuery] string sdi, [FromQuery] int mrid, [FromQuery] string interval = "instant", [FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
+        public async Task<IActionResult> DeleteModeledData([FromQuery] string sdi, [FromQuery] int mrid, [FromQuery] SeriesInterval interval = SeriesInterval.instant, [FromQuery] DateTime? startDate = null, [FromQuery] DateTime? endDate = null)
         {
             if (string.IsNullOrEmpty(sdi))
             {
@@ -289,7 +295,7 @@ namespace HdbApi.Controllers
                 db = await _databaseService.GetConnectionAsync(HttpContext);
 
                 // First, select the data points to delete
-                var tableName = $"m_{interval.ToLower()}";
+                var tableName = $"M_{interval.ToString().ToUpper()}";
                 var selectSql = $"SELECT start_date_time FROM {tableName} WHERE site_datatype_id = :sdi AND model_run_id = :mrid";
                 var parameters = new DynamicParameters();
                 parameters.Add("sdi", sdi);
@@ -319,7 +325,7 @@ namespace HdbApi.Controllers
                 int deletedCount = 0;
                 foreach (var dateTime in dataPoints)
                 {
-                    hdbProcessor.delete_from_hdb(db, decimal.Parse(sdi), dateTime, interval.ToLower(), mrid);
+                    hdbProcessor.delete_from_hdb(db, decimal.Parse(sdi), dateTime, interval.ToString(), mrid);
                     deletedCount++;
                 }
 

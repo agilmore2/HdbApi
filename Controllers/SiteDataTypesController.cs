@@ -42,32 +42,23 @@ namespace HdbApi.Controllers
 
                 if (!string.IsNullOrEmpty(sdi))
                 {
-                    var ids = sdi.Split(',').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x));
-                    if (ids.Any())
-                    {
-                        var idList = string.Join(",", ids);
-                        conditions.Add($"SITE_DATATYPE_ID in ({idList})");
-                    }
+                    var idList = ParseIntIds(sdi);
+                    if (idList == null) return BadRequest(new { error = "sdi must be integers" });
+                    conditions.Add($"SITE_DATATYPE_ID in ({idList})");
                 }
 
                 if (!string.IsNullOrEmpty(sid))
                 {
-                    var ids = sid.Split(',').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x));
-                    if (ids.Any())
-                    {
-                        var idList = string.Join(",", ids);
-                        conditions.Add($"SITE_ID in ({idList})");
-                    }
+                    var idList = ParseIntIds(sid);
+                    if (idList == null) return BadRequest(new { error = "sid must be integers" });
+                    conditions.Add($"SITE_ID in ({idList})");
                 }
 
                 if (!string.IsNullOrEmpty(did))
                 {
-                    var ids = did.Split(',').Select(x => x.Trim()).Where(x => !string.IsNullOrEmpty(x));
-                    if (ids.Any())
-                    {
-                        var idList = string.Join(",", ids);
-                        conditions.Add($"DATATYPE_ID in ({idList})");
-                    }
+                    var idList = ParseIntIds(did);
+                    if (idList == null) return BadRequest(new { error = "did must be integers" });
+                    conditions.Add($"DATATYPE_ID in ({idList})");
                 }
 
                 if (conditions.Any())
@@ -124,20 +115,23 @@ namespace HdbApi.Controllers
 
                 if (sdi.Length > 0)
                 {
-                    var ids = string.Join(",", sdi);
-                    conditions.Add($"SITE_DATATYPE_ID in ({ids})");
+                    var idList = ParseIntIds(sdi);
+                    if (idList == null) return BadRequest(new { error = "sdi must be integers" });
+                    conditions.Add($"SITE_DATATYPE_ID in ({idList})");
                 }
 
                 if (sid.Length > 0)
                 {
-                    var ids = string.Join(",", sid);
-                    conditions.Add($"SITE_ID in ({ids})");
+                    var idList = ParseIntIds(sid);
+                    if (idList == null) return BadRequest(new { error = "sid must be integers" });
+                    conditions.Add($"SITE_ID in ({idList})");
                 }
 
                 if (did.Length > 0)
                 {
-                    var ids = string.Join(",", did);
-                    conditions.Add($"DATATYPE_ID in ({ids})");
+                    var idList = ParseIntIds(did);
+                    if (idList == null) return BadRequest(new { error = "did must be integers" });
+                    conditions.Add($"DATATYPE_ID in ({idList})");
                 }
 
                 if (conditions.Any())
@@ -163,6 +157,15 @@ namespace HdbApi.Controllers
                 }
             }
         }
+
+        private static string? ParseIntIds(IEnumerable<string> ids)
+        {
+            var list = ids.Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+            return list.All(x => long.TryParse(x, out _)) ? string.Join(",", list) : null;
+        }
+
+        private static string? ParseIntIds(string csv) =>
+            ParseIntIds(csv.Split(','));
 
         public class SiteDataTypeQuery
         {
